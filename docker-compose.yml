@@ -1,0 +1,8 @@
+version: '2.1'
+
+services:
+  bletracker:
+    image: bletracker
+    build: .
+    environment:
+      NODE_ENV: production
