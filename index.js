@@ -1,16 +1,5 @@
 var mqtt = require('mqtt')
 var client = mqtt.connect('mqtt://10.10.10.1')
-var mysql = require('mysql');
-var connection = mysql.createConnection({
-    host: '10.10.10.5',
-    user: 'root',
-    password: '123456',
-    database: 'presence'
-});
-
-connection.connect();
-
-
 
 var devices = {
 
@@ -50,20 +39,28 @@ var users = {
 
 var userMap = {};
 
-function getPosition(values,old) {
+function getPosition(values, old) {
     var ret = "Unknown";
     const { basement = 40, uppe = 40 } = values;
     var diff = Math.abs(basement - uppe);
-    var halfDiff = diff/2;
+    var halfDiff = diff / 2;
     console.log(uppe, basement, halfDiff);
-    
-    if (uppe < halfDiff) {
-        ret = "Kontoret";
+    if (uppe < 5) {
+        ret = "Kontoret"
+    }
+    else if (uppe < halfDiff) {
+        ret = "Uppe";
+    }
+    else if (basement < 5) {
+        ret = "Gamerum";
     }
     else if (basement < halfDiff) {
-        ret = "Källaren"
+        ret = "Källaren";
     }
-    else if (diff < 4) {
+    else if (uppe > 47 && uppe < 100 && basement>16 && basement<25) {
+        ret = "Köket";
+    }
+    else if (diff < 25 && uppe>20 && basement>20) {
         ret = "Mellanvåning"
     }
     else {
@@ -76,15 +73,32 @@ function calculateUserPosition(device, mac) {
 
     if (users[mac]) {
         var values = device;
-        var oldPosition = userMap[users[mac]];
+        var oldPosition = (userMap[users[mac]] || {}).position;
         var position = getPosition(values, oldPosition);
-        if (oldPosition!=position) {
-            client.publish("/user/"+users[mac]+"/state",position);
-            userMap[users[mac]] = position;
+        const lastChange = new Date();
+        if (oldPosition != position) {
+            console.log('sending new position', users[mac]);
+            client.publish("/user/" + users[mac] + "/state", position);
+            userMap[users[mac]] = {
+                position,
+                lastChange
+            };
         }
-        
+
     }
 }
+
+setInterval(() => {
+    const isDead = new Date();
+    isDead.setMinutes( isDead.getMinutes() - 5 );
+    for(var key in users) {
+        var user = users[key];
+        if (user.lastChange<isDead) {
+            console.log('sending lost range ',user);
+            client.publish("/user/" + user + "/state", "Okänd");
+        }
+    }
+}, 40000);
 
 client.on('message', function (topic, message) {
     // message is Buffer
@@ -99,11 +113,11 @@ client.on('message', function (topic, message) {
 
     calculateUserPosition(devices[mac], mac);
 
-    console.log(userMap);
+    //console.log(userMap);
 
     //    console.log(place, mac, message.toString());
 
-    console.log(devices);
+    //console.log(devices);
 
 })
 
