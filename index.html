@@ -1,0 +1,60 @@
+<body>
+    <h1>Train you location</h1>
+</body>
+<ul id="rooms">
+</ul>
+<span id="start">Start</span> | <span id="stop">Stop</span>
+<script>
+
+    function send(data) {
+        connection.send(JSON.stringify(data));
+    }
+
+    var rooms = ['Kontoret', 'Köket', 'Vardagsrum', 'Bio'];
+
+    var roomsElm = document.getElementById('rooms');
+    rooms.forEach(room => {
+        var li = document.createElement('li');
+        li.innerText = room;
+        li.addEventListener('click', () => {
+            console.log('select', room);
+            send({ room });
+        }, false)
+        roomsElm.appendChild(li);
+    });
+
+    document.getElementById('start').addEventListener('click', () => {
+        send({ start: true });
+    }, false)
+
+    document.getElementById('stop').addEventListener('click', () => {
+        send({ stop: true });
+    }, false)
+    // if user is running mozilla then use it's built-in WebSocket
+    window.WebSocket = window.WebSocket || window.MozWebSocket;
+
+    var connection = new WebSocket('ws://127.0.0.1:1337');
+
+    connection.onopen = function () {
+        // connection is opened and ready to use
+
+    };
+
+    connection.onerror = function (error) {
+        // an error occurred when sending/receiving data
+    };
+
+    connection.onmessage = function (message) {
+        // try to decode json (I assume that each message
+        // from server is json)
+        try {
+            var json = JSON.parse(message.data);
+        } catch (e) {
+            console.log('This doesn\'t look like a valid JSON: ',
+                message.data);
+            return;
+        }
+        // handle incoming message
+    };
+
+</script>
