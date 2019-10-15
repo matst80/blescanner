@@ -1,6 +1,5 @@
 var fs = require('fs');
 var path = require('path');
-const { NeuralNetwork } = require('brain.js');
 const MongoClient = require('mongodb').MongoClient;
 const dbClient = new MongoClient('mongodb://10.10.10.1:27017');
 var WebSocketServer = require('websocket').server;
@@ -8,10 +7,12 @@ var http = require('http');
 
 const connections = [];
 
+const deviceMac = 'd1:00:00:03:47:0d';
+
 function findValues(start, stop, mac, all) {
-    return all.filter(({ when, devices }) => start < when && stop > when && devices['57:d9:16:0f:84:22']).map(({ devices }) => {
-        return devices['57:d9:16:0f:84:22'];
-    }).filter(d => d.uppe && d.basement);
+    return all.filter(({ when, devices }) => start < when && stop > when && devices[deviceMac]).map(({ devices }) => {
+        return devices[deviceMac];
+    });
 }
 
 var currentRoom;
@@ -87,7 +88,9 @@ dbClient.connect((err) => {
 
             if (message.type === 'utf8') {
                 // process WebSocket message
+                
                 var data = JSON.parse(message.utf8Data)
+                console.log('got',data);
                 if (data.room)
                     currentRoom = data.room;
                 if (data.start)
@@ -114,19 +117,24 @@ dbClient.connect((err) => {
     const userCollection = db.collection('usermap');
     const allCollection = db.collection('scans');
 
-    var start = new Date();
-    start.setHours(start.getHours() - 2);
-    var stop = new Date();
-    var mac = '67:ca:0e:39:b8:0c';
+    var roomNames = ['Kontoret', 'Köket', 'Vardagsrum', 'Bio', 'Sovrum'];
+    var mac = deviceMac; //chipolo
 
     allCollection.find({}).toArray((err, docs) => {
 
-        var values = findValues(start, stop, mac, docs).map(d => ({ input: [d.uppe, d.basement], output: '1' }));
+        db.collection('rooms').find({}).toArray((err, rooms)=> {
 
-        const net = new NeuralNetwork();
-        net.train(values);
+        rooms.forEach(({room,start,stop}) => {
+            var roomIdx = roomNames.indexOf(room);
+            var values = findValues(start, stop, mac, docs).map(d => ({ input: [d.uppe||120, d.entre||120, d.basement||120], output: roomIdx }));
+            console.log(start,stop, values);
+        });
 
-        console.log(err, values);
+        
+
+        });
+
+        
     });
 
     userCollection.find({}).toArray((err, docs) => {

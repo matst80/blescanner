@@ -38,26 +38,25 @@ var userMap = {};
 
 function getPosition(values, old) {
     var ret = "Unknown";
-    const { basement = 40, uppe = 40 } = values;
-    var diff = Math.abs(basement - uppe);
-    var halfDiff = diff / 2;
-    console.log(uppe, basement, halfDiff);
-    if (uppe < 5) {
+    const { basement = 203, uppe = 203, entre=203 } = values;
+    if (uppe > 200 & basement > 200 & entre > 200)
+        ret = "Inte hemma";
+    else if (uppe < 20) {
         ret = "Kontoret"
     }
-    else if (uppe < halfDiff) {
-        ret = "Uppe";
-    }
-    else if (basement < 5) {
+    else if (basement < 20) {
         ret = "Gamerum";
     }
-    else if (basement < halfDiff) {
+    else if (entre < 20) {
+        ret = "Entre"
+    }
+    else if (uppe < entre && uppe < basement) {
+        ret = "Uppe";
+    }
+    else if (basement < entre && basement < uppe) {
         ret = "Källaren";
     }
-    else if (uppe > 47 && uppe < 100 && basement > 16 && basement < 25) {
-        ret = "Köket";
-    }
-    else if (diff < 25 && uppe > 20 && basement > 20) {
+    else if (entre < basement && entre < uppe) {
         ret = "Mellanvåning"
     }
     else {
@@ -75,6 +74,7 @@ function calculateUserPosition(device, mac) {
         var position = getPosition(values, oldPosition);
         const lastChange = new Date();
         if (oldPosition != position) {
+            console.log('update position:',users[mac], position)
             mqttClient.publish("/user/" + users[mac] + "/state", position);
             userMap[users[mac]] = {
                 position,
@@ -98,7 +98,7 @@ setInterval(() => {
     }
 }, 40000);
 
-const avergeLength = 4;
+const avergeLength = 3;
 
 function getAverage(mac, place, distance) {
 
@@ -145,24 +145,26 @@ dbClient.connect((err) => {
         });
 
         mqttClient.on('message', function (topic, message) {
-
+            
             var placeAndMac = topic.replace('room_presence/', '');
             const [place, mac] = placeAndMac.split('/');
             const distance = calculateDistance((message - 0));
 
-            devices[mac] = {
-                ...devices[mac],
-                [place]: getAverage(mac, place, distance)
-            };
+            //if (users[mac]) {
+                devices[mac] = {
+                    ...devices[mac],
+                    [place]: getAverage(mac,place,distance)
+                };
+            //}
 
-            allCollection.insert({ devices, when:new Date()}, (err,res)=>{
+            allCollection.insertOne({ devices, when:new Date()}, (err,res)=>{
                 if (err)
                     console.warn(err);
             });
-
+            
             calculateUserPosition(devices[mac], mac);
 
-            console.log(userMap, devices);
+            //console.log(devices);
 
         })
     }
